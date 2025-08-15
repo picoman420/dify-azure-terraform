@@ -1,19 +1,17 @@
 resource "azurerm_storage_account" "aca_storage" {
-  name                     = "sadify"
+  name                     = "sadify123"
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
 }
 
-# 各コンテナが必要とする設定ファイル等をリンクするための file share 用 コンテナ
 resource "azurerm_storage_container" "dify_fileshare" {
   storage_account_id    = azurerm_storage_account.aca_storage.id
   name                  = "dify-fileshare"
   container_access_type = "private"
 }
 
-# Dify データ格納用コンテナ
 resource "azurerm_storage_container" "dify_data" {
   storage_account_id    = azurerm_storage_account.aca_storage.id
   name                  = "dify-data"
