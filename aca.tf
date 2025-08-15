@@ -1,5 +1,5 @@
 resource "azurerm_log_analytics_workspace" "aca" {
-  name                = "logaw-dify-${var.region}-001"
+  name                = "logaw-dify-southeastasia-001"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
@@ -7,7 +7,7 @@ resource "azurerm_log_analytics_workspace" "aca" {
 }
 
 resource "azurerm_container_app_environment" "dify" {
-  name                       = "cae-dify-${var.region}-001"
+  name                       = "cae-dify-southeastasia-001"
   location                   = azurerm_resource_group.rg.location
   resource_group_name        = azurerm_resource_group.rg.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.aca.id
@@ -23,14 +23,12 @@ resource "azurerm_container_app_environment" "dify" {
     minimum_count         = 0
   }
 
-  # 各コンテナがデータ系のサービスを必要とするので、依存関係を ACA env に設定しておく
   depends_on = [
     azurerm_redis_cache.redis,
     azurerm_postgresql_flexible_server.postgres
   ]
 }
 
-# 各コンテナに必要な環境変数をファイルからローカル変数に読み込む
 locals {
   env_nginx = tomap({
     for line in split("\n", file("./env-vars/.env.nginx")) :
@@ -74,7 +72,6 @@ locals {
     if length(split("=", line)) >= 2 && !startswith(line, "#")
   })
 
-  # api, worker, plugin_daemon に共通の環境変数はここに定義
   env_shared = tomap({
     for line in split("\n", file("./env-vars/.env.shared")) :
     split("=", line)[0] => join("=", slice(split("=", line), 1, length(split("=", line))))
@@ -168,7 +165,7 @@ resource "azurerm_container_app" "nginx" {
     }
 
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "nginx"
@@ -176,14 +173,12 @@ resource "azurerm_container_app" "nginx" {
       cpu    = 0.5
       memory = "1Gi"
 
-
       command = [
         "sh",
         "-c",
         "cp -r /mnt/nginx/conf/* /etc/nginx && chmod +x /mnt/entrypoint/docker-entrypoint.sh && /mnt/entrypoint/docker-entrypoint.sh"
       ]
 
-      # 直接 /etc/nginx にマウントすると、nginx の設定が上書きされてしまうので、別の場所にマウントしてから cp する
       volume_mounts {
         name = "nginx-conf"
         path = "/mnt/nginx/conf"
@@ -241,7 +236,7 @@ resource "azurerm_container_app" "ssrfproxy" {
     }
 
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "ssrfproxy"
@@ -255,7 +250,6 @@ resource "azurerm_container_app" "ssrfproxy" {
         "cp -r /mnt/squid/* /etc/squid && chmod +x /mnt/entrypoint/docker-entrypoint.sh && /mnt/entrypoint/docker-entrypoint.sh"
       ]
 
-      # 直接 /etc/squid にマウントすると設定が上書きされてしまうので、別の場所にマウントしてから cp する
       volume_mounts {
         name = "ssrfproxy-conf"
         path = "/mnt/squid"
@@ -289,7 +283,8 @@ resource "azurerm_container_app" "ssrfproxy" {
   }
 
   ingress {
-    target_port = 3128
+    target_port      = 3128
+    external_enabled = false
     traffic_weight {
       percentage      = 100
       latest_revision = true
@@ -312,7 +307,7 @@ resource "azurerm_container_app" "sandbox" {
     }
 
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "langgenius"
@@ -353,7 +348,8 @@ resource "azurerm_container_app" "sandbox" {
   }
 
   ingress {
-    target_port = 8194
+    target_port      = 8194
+    external_enabled = false
     traffic_weight {
       percentage      = 100
       latest_revision = true
@@ -375,7 +371,7 @@ resource "azurerm_container_app" "plugindaemon" {
       concurrent_requests = "10"
     }
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "langgenius"
@@ -460,6 +456,42 @@ resource "azurerm_container_app" "plugindaemon" {
         name  = "AZURE_BLOB_CONTAINER_NAME"
         value = azurerm_storage_container.dify_data.name
       }
+      env {
+        name  = "UV_COPY"
+        value = "1"
+      }
+      env {
+        name  = "UV_LINK_MODE"
+        value = "copy"
+      }
+      env {
+        name  = "PYTHON_INTERPRETER_PATH"
+        value = "/usr/bin/python3.12"
+      }
+      env {
+        name  = "PLUGIN_WORKING_PATH"
+        value = "/tmp/plugin_workdir"
+      }
+      env {
+        name  = "PLUGIN_INSTALLED_PATH"
+        value = "/tmp/plugin_installed"
+      }
+      env {
+        name  = "PLUGIN_PACKAGE_CACHE_PATH"
+        value = "/app/storage/plugin_packages"
+      }
+      env {
+        name  = "UV_NO_SYMLINKS"
+        value = "1"
+      }
+      env {
+        name  = "VIRTUAL_ENV_DISABLE_PROMPT"
+        value = "1"
+      }
+      env {
+        name  = "PYTHONPATH"
+        value = "/tmp/plugin_workdir"
+      }
     }
 
     volume {
@@ -470,8 +502,8 @@ resource "azurerm_container_app" "plugindaemon" {
   }
 
   ingress {
-    target_port  = 5002
-    exposed_port = 5002
+    target_port      = 5002
+    external_enabled = false
     traffic_weight {
       percentage      = 100
       latest_revision = true
@@ -495,13 +527,13 @@ resource "azurerm_container_app" "api" {
       concurrent_requests = "10"
     }
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "langgenius"
       image  = var.dify-api-image
-      cpu    = 2
-      memory = "4Gi"
+      cpu    = 0.5
+      memory = "1Gi"
 
       volume_mounts {
         name = "api-storage"
@@ -626,8 +658,8 @@ resource "azurerm_container_app" "api" {
   }
 
   ingress {
-    target_port  = 5001
-    exposed_port = 5001
+    target_port      = 5001
+    external_enabled = false
     traffic_weight {
       percentage      = 100
       latest_revision = true
@@ -651,13 +683,13 @@ resource "azurerm_container_app" "web" {
       concurrent_requests = "10"
     }
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "langgenius"
       image  = var.dify-web-image
-      cpu    = 1
-      memory = "2Gi"
+      cpu    = 0.5
+      memory = "1Gi"
 
       dynamic "env" {
         for_each = local.env_web
@@ -679,8 +711,8 @@ resource "azurerm_container_app" "web" {
   }
 
   ingress {
-    target_port  = 3000
-    exposed_port = 3000
+    target_port      = 3000
+    external_enabled = false
     traffic_weight {
       percentage      = 100
       latest_revision = true
@@ -704,13 +736,13 @@ resource "azurerm_container_app" "worker" {
       concurrent_requests = "10"
     }
     max_replicas = 10
-    min_replicas = 1
+    min_replicas = 0
 
     container {
       name   = "langgenius"
       image  = var.dify-api-image
-      cpu    = 2
-      memory = "4Gi"
+      cpu    = 0.5
+      memory = "1Gi"
 
       dynamic "env" {
         for_each = local.env_shared
