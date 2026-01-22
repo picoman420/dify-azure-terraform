@@ -1,9 +1,18 @@
+resource "random_id" "storage_suffix" {
+  byte_length = 4
+}
+
+locals {
+  storage_account_name = var.storage_account_name != null ? var.storage_account_name : "sadify${random_id.storage_suffix.hex}"
+}
+
 resource "azurerm_storage_account" "aca_storage" {
-  name                     = "sadify123"
+  name                     = substr(replace(lower(local.storage_account_name), "-", ""), 0, 24)
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
+  min_tls_version          = "TLS1_2"
 }
 
 resource "azurerm_storage_container" "dify_fileshare" {

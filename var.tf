@@ -1,6 +1,7 @@
 variable "subscription_id" {
-  type    = string
-  default = "id"
+  type        = string
+  description = "Azure subscription ID"
+  # No default - must be provided explicitly
 }
 
 variable "region" {
@@ -33,7 +34,40 @@ variable "dify-web-image" {
   default = "langgenius/dify-web:1.4.1"
 }
 
+variable "resource_group_name" {
+  type        = string
+  description = "Name of the resource group"
+  default     = "rg-dify"
+}
+
+variable "storage_account_name" {
+  type        = string
+  description = "Name of the storage account (must be globally unique, 3-24 chars, lowercase alphanumeric)"
+  default     = null
+}
+
+variable "postgres_admin_password" {
+  type        = string
+  description = "PostgreSQL administrator password (should be provided via Key Vault)"
+  sensitive   = true
+  # No default - must be provided explicitly
+}
+
+variable "nginx_image" {
+  type        = string
+  description = "Nginx container image"
+  default     = "nginx:1.27-alpine"
+}
+
+variable "squid_image" {
+  type        = string
+  description = "Squid proxy container image"
+  default     = "ubuntu/squid:5.2-22.04_beta"
+}
+
 variable "dify-api-secret-key" {
-  type    = string
-  default = "sk-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U"
+  type        = string
+  description = "Secret key for Dify API (should be provided via environment variable or Key Vault)"
+  sensitive   = true
+  # No default - must be provided explicitly
 }

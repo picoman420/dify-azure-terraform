@@ -23,7 +23,7 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   private_dns_zone_id           = azurerm_private_dns_zone.postgres.id
   public_network_access_enabled = false
   administrator_login           = "user"
-  administrator_password        = "<administration_password>" # TODO: use vault
+  administrator_password        = local.postgres_password
   zone                          = "1"
 
   storage_mb   = 32768
