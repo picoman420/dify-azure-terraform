@@ -169,7 +169,7 @@ resource "azurerm_container_app" "nginx" {
 
     container {
       name   = "nginx"
-      image  = "nginx:latest"
+      image  = var.nginx_image
       cpu    = 0.5
       memory = "1Gi"
 
@@ -214,6 +214,8 @@ resource "azurerm_container_app" "nginx" {
   ingress {
     target_port      = 80
     external_enabled = true
+    transport        = "auto"
+    allow_insecure   = false
 
     traffic_weight {
       percentage      = 100
@@ -240,7 +242,7 @@ resource "azurerm_container_app" "ssrfproxy" {
 
     container {
       name   = "ssrfproxy"
-      image  = "ubuntu/squid:latest"
+      image  = var.squid_image
       cpu    = 0.5
       memory = "1Gi"
 
